@@ -1,4 +1,10 @@
 package io.hexlet.repository;
 
-public interface UserRepository {
+import io.hexlet.model.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface UserRepository extends JpaRepository<User, Long> {
+
 }

@@ -2,7 +2,10 @@ package io.hexlet.controller;
 
 import io.hexlet.model.Post;
 import io.hexlet.model.User;
+import io.hexlet.repository.UserRepository;
 import io.hexlet.util.SlugUtils;
+import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,19 +17,17 @@ import java.util.Objects;
 @RestController
 @RequestMapping("/api")
 public class UserController {
-    private final List<User> users;
 
-    public UserController(List<User> users) {
-        this.users = users;
-    }
+    @Autowired
+    private UserRepository userRepository;
 
     @GetMapping("/users")
     public ResponseEntity<List<User>> index(@RequestParam(defaultValue = "10") Integer limit) {
-        var result = users.stream().limit(limit).toList();
+        var users = userRepository.findAll().stream().limit(limit).toList();
 
         return ResponseEntity.ok()
-                .header("X-Total-Posts", String.valueOf(users.size()))
-                .body(result);
+                .header("X-Total-Posts", String.valueOf(userRepository.count()))
+                .body(users);
     }
 
     @PostMapping("/users")
@@ -36,28 +37,28 @@ public class UserController {
             user.setEmail("Email не может быть пустым");
             return ResponseEntity.badRequest().body(user);
         }
-        users.add(user);
+        userRepository.save(user);
         return ResponseEntity.created(URI.create("/users/" + user.getId()))
                 .body(user);
     }
 
     @GetMapping("/users/{id}")
     public ResponseEntity<User> show(@PathVariable("id") Long id) {
-        var user = users.stream()
-                .filter(u -> Objects.equals(u.getId(), id))
-                .findFirst();
+        var user = userRepository.findById(id);
+
         return user.map(value -> ResponseEntity.ok().body(value)).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PutMapping("/users/{id}") // Обновление страницы
     public ResponseEntity<User> update(@PathVariable Long id, @RequestBody User data) {
-        var maybeUser = users.stream()
-                .filter(u -> Objects.equals(u.getId(), id))
-                .findFirst();
+        var maybeUser = userRepository.findById(id);
+
         if (maybeUser.isPresent()) {
             var user = maybeUser.get();
+            userRepository.save(user);
             user.setEmail(data.getEmail());
-            user.setName(data.getName());
+            user.setFirstName(data.getFirstName());
+            user.setLastName(data.getLastName());
             return ResponseEntity.ok()
                     .body(user);
         }
@@ -66,10 +67,10 @@ public class UserController {
 
     @DeleteMapping("/users/{id}")
     public ResponseEntity<Void> delete(@PathVariable("id") Long id) {
-        boolean remove = users.removeIf(u -> Objects.equals(u.getId(), id));
-
-        return (remove)
-                ? ResponseEntity.noContent().build()
-                : ResponseEntity.notFound().build();
+        if (userRepository.existsById(id)) {
+            userRepository.deleteById(id);
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.notFound().build();
     }
 }

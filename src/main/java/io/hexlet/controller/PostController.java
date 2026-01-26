@@ -1,72 +1,76 @@
 package io.hexlet.controller;
 
+import io.hexlet.DTO.PostCreateDTO;
+import io.hexlet.exception.ResourceNotFoundException;
 import io.hexlet.model.Post;
-import io.hexlet.util.SlugUtils;
-import org.springframework.http.ResponseEntity;
+import io.hexlet.repository.PostRepository;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
+import org.springframework.http.*;
 import java.net.URI;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
+
 @RestController
+@Validated
 @RequestMapping("/api")
 public class PostController {
-    private final List<Post> posts;
 
-    public PostController(List<Post> posts) {
-        this.posts = posts;
-    }
+    @Autowired
+    private PostRepository postRepository;
 
     @GetMapping("/posts")
     public ResponseEntity<List<Post>> index(@RequestParam(defaultValue = "10") Integer limit) {
-        var result = posts.stream().limit(limit).toList();
+        var result = postRepository.findAll().stream().limit(limit).toList();
 
         return ResponseEntity.ok()
-                .header("X-Total-Posts", String.valueOf(posts.size()))
+                .header("X-Total-Posts", String.valueOf(postRepository.count()))
                 .body(result);
     }
 
     @PostMapping("/posts")
-    public ResponseEntity<Post> create(@RequestBody Post post) {
+    public ResponseEntity<Post> create(@Valid @RequestBody PostCreateDTO data) {
+        Post post = new Post();
+        post.setTitle(data.title());
+        post.setContent(data.content());
+        post.setPublished(data.published());
         post.setCreatedAt(LocalDateTime.now());
-        post.setSlug(SlugUtils.generateSlug(post.getTitle()));
-        posts.add(post);
-        return ResponseEntity.created(URI.create("/posts/" + post.getSlug()))
-                .body(post);
+        Post savedPost = postRepository.save(post);
+        return ResponseEntity.created(URI.create("/posts/" + savedPost.getId()))
+                .body(savedPost);
     }
 
-    @GetMapping("/posts/{slug}")
-    public ResponseEntity<Post> show(@PathVariable("slug") String slug) {
-        var post = posts.stream()
-                .filter(p -> p.getSlug().equals(slug))
-                .findFirst();
-        return post.map(value -> ResponseEntity.ok().body(value)).orElseGet(() -> ResponseEntity.notFound().build());
+    @GetMapping("/posts/{id}")
+    @ResponseStatus(HttpStatus.OK)
+    public Post show(@PathVariable("id") Long id) {
+        return postRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Entity " + id + " Not found"));
     }
 
-    @PutMapping("/posts/{slug}") // Обновление страницы
-    public ResponseEntity<Post> update(@PathVariable String slug, @RequestBody Post data) {
-        var maybePost = posts.stream()
-                .filter(p -> p.getSlug().equals(slug))
-                .findFirst();
-        if (maybePost.isPresent()) {
-            var post = maybePost.get();
-            post.setTitle(data.getTitle());
-            post.setContent(data.getContent());
-            post.setAuthor(data.getAuthor());
-            return ResponseEntity.ok()
-                    .body(post);
-        }
-        return ResponseEntity.notFound().build();
+    @PutMapping("/posts/{id}") // Обновление страницы
+    @ResponseStatus(HttpStatus.OK)
+    public Post update(@PathVariable Long id, @Valid @RequestBody PostCreateDTO data) {
+        var post = postRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Entity " + id + " Not found"));
+
+        // ✅ Обновляем ПОЛЯ
+        post.setTitle(data.title());
+        post.setContent(data.content());
+        post.setPublished(data.published());
+
+        // ✅ Сохраняем ПОСЛЕ изменений
+        return postRepository.save(post);
     }
 
-    @DeleteMapping("/posts/{slug}")
-    public ResponseEntity<Void> delete(@PathVariable("slug") String slug) {
-        boolean remove = posts.removeIf(p -> p.getSlug().equals(slug));
-
-        return (remove)
-                ? ResponseEntity.noContent().build()
-                : ResponseEntity.notFound().build();
+    @DeleteMapping("/posts/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable("id") Long id) {
+        var post = postRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Entity " + id + " Not found"));
+        postRepository.deleteById(id);
     }
 }
