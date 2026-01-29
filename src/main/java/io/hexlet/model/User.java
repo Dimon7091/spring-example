@@ -2,17 +2,26 @@ package io.hexlet.model;
 
 
 import jakarta.persistence.*;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedBy;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import java.time.LocalDateTime;
+import java.util.prefs.Preferences;
 
 import static jakarta.persistence.GenerationType.IDENTITY;
 
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 
 @Entity
 @Table(name = "users")
-@Getter
-@Setter
+@EntityListeners(AuditingEntityListener.class)
 public class User {
     @Id
     @GeneratedValue(strategy = IDENTITY)
@@ -23,5 +32,13 @@ public class User {
     private String email;
     private String firstName;
     private String lastName;
+
+    @LastModifiedDate
+    private LocalDateTime updatedAt;
+
+    @CreatedDate
+    @Column(updatable = false, nullable = false)
+    private LocalDateTime createdAt;
+
 }
 
