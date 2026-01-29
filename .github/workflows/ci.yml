@@ -1,0 +1,40 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'gradle'  # Ускорит сборку
+
+      - run: ./gradlew test
+
+      - name: Generate JaCoCo Badge
+        uses: cicirello/jacoco-badge-generator@v2
+        with:
+          generate-summary: true
+          jacoco-csv-file: build/reports/jacoco/test/jacocoTestReport.csv  # ✅ ПРАВИЛЬНЫЙ
+          badges-directory: .github/badges
+
+      - name: Verify Badge  # Проверка создания
+        run: |
+          ls -la .github/badges/ || mkdir -p .github/badges
+          test -f .github/badges/jacoco.svg && echo "✅ jacoco.svg создан" || echo "❌ jacoco.svg НЕ создан"
+
+      - name: Commit Badge  # ✅ КОММИТ В main
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .github/badges/jacoco.svg || true
+          git diff --staged --quiet || git commit -m "Update JaCoCo badge [skip ci]"
+          git push || true
+
+
+
